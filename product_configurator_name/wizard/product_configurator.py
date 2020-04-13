@@ -6,6 +6,9 @@ from odoo.osv import orm
 from odoo import api, models, _
 from odoo.exceptions import Warning
 
+hide = _("Hide")
+onlyvalue = _("Only Value")
+withlabel = _("With Label")
 
 class ProductConfigurator(models.TransientModel):
     _inherit = 'product.configurator'
@@ -77,7 +80,7 @@ class ProductConfigurator(models.TransientModel):
 
         for line in attribute_lines:
             attribute = line.attribute_id
-            DISPLAY_SELECTION = [('hide', 'Hide'), ('value', 'Only Value'), ('attribute', 'With Label')]
+            DISPLAY_SELECTION = [('hide', hide), ('value', onlyvalue), ('attribute', withlabel)]
             res[self.mode_prefix + str(attribute.id)] = dict(
                 default_attrs,
                 type='selection',

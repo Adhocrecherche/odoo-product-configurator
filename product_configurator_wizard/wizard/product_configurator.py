@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from ast import literal_eval
 from lxml import etree
 
 from odoo.osv import orm
@@ -17,7 +16,6 @@ def m2o_convert_to_read(value_id, use_name_get=True):
 
 
 class FreeSelection(fields.Selection):
-
     def convert_to_cache(self, value, record, validate=True):
         return super(FreeSelection, self).convert_to_cache(
             value=value, record=record, validate=False)
@@ -289,18 +287,6 @@ class ProductConfigurator(models.TransientModel):
             vals.update(nvals)
         return {'value': vals, 'domain': domains}
 
-    @api.model
-    def _default_product_modifiable(self):
-        product_modifiable = literal_eval(self.env['ir.config_parameter'].sudo().get_param(
-            'product_configurator.product_modifiable', default='False'))
-        return product_modifiable
-
-    @api.model
-    def _default_product_reusable(self):
-        product_reusable = literal_eval(self.env['ir.config_parameter'].sudo().get_param(
-            'product_configurator.product_reusable', default='False'))
-        return product_reusable
-
     attribute_line_ids = fields.One2many(
         comodel_name='product.attribute.line',
         related='product_tmpl_id.attribute_line_ids',
@@ -336,9 +322,6 @@ class ProductConfigurator(models.TransientModel):
         comodel_name='sale.order.line',
         readonly=True,
     )
-    product_modifiable = fields.Boolean('Modify Selected Variant', default=_default_product_modifiable)
-    product_reusable = fields.Boolean('Reuse Variant, Do Not Duplicate', default=_default_product_reusable)
-    product_force_create = fields.Boolean('Must Create Variant', default=False)
 
     @api.model
     def fields_get(self, allfields=None, attributes=None):
@@ -608,11 +591,7 @@ class ProductConfigurator(models.TransientModel):
                 on_change="onchange_attribute_value(%s, context)" % field_name,
                 default_focus="1" if attr_line == attr_lines[0] else "0",
                 attrs=str(attrs),
-                context=str({
-                    'show_attribute': False,
-                    'product_tmpl_id': wiz.product_tmpl_id.id,
-                    'default_attribute_id': attribute_id
-                }),
+                context="{'show_attribute': False}",
                 options=str({
                     'no_create': not attr_line.attribute_id.create_on_the_fly,
                     'no_create_edit': not attr_line.attribute_id.create_on_the_fly,
@@ -965,41 +944,8 @@ class ProductConfigurator(models.TransientModel):
         # error legitimately raised in a nested routine
         # is passed through.
         try:
-            # - create when reusable, will reuse matching instead of creating duplicate
-            # - update when modifiable, will change current variant instead of picking/creating new one
-            duplicates = self.product_tmpl_id.find_duplicates(self.value_ids.ids, custom_vals, product_id=self.product_id)
-            if self.product_id:
-                # used cogs icon (or selected variant in first step)
-                variant = self.product_id
-                if variant in duplicates:
-                    # no change, leave as is
-                    pass
-                elif not self.product_modifiable:
-                    variant = self.product_tmpl_id.create_get_variant(
-                        self.value_ids.ids, custom_vals)
-                elif duplicates and self.product_reusable:
-                    # variant duplicates another product, warn user
-                    raise ValidationError(
-                        _('Duplicate configuration! Variant already exists (id={})').format(duplicates[0].id)
-                    )
-                else:
-                    # modify current variant
-                    vals = self.product_tmpl_id.get_update_variant_vals(self.value_ids.ids, custom_vals)
-                    variant.write(vals)
-            else:
-                if duplicates and self.product_reusable and self.product_force_create:
-                    # variant duplicates another product, warn user
-                    raise ValidationError(
-                        _('Duplicate configuration! Variant already exists (id={})').format(duplicates[0].id)
-                    )
-                # creating new SO line
-                if self.product_reusable:
-                    variant = self.product_tmpl_id.create_get_variant(
-                        self.value_ids.ids, custom_vals)
-                else:
-                    # create a new variant
-                    vals = self.product_tmpl_id.get_variant_vals(self.value_ids.ids, custom_vals)
-                    variant = self.env['product.product'].create(vals)
+            variant = self.product_tmpl_id.create_get_variant(
+                self.value_ids.ids, custom_vals)
         except ValidationError:
             raise
         except Exception as e:

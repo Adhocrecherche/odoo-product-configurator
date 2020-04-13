@@ -16,7 +16,7 @@ class ProductProduct(models.Model):
 
         wizard_obj = self.env['product.configurator']
         wizard = wizard_obj.create({
-            'product_modifiable': True,
+            'modify_variant': True,
             'product_tmpl_id': self.id,
             'product_id': self.id,
             'state': active_step,
@@ -50,8 +50,7 @@ class ProductTemplate(models.Model):
 
         wizard_obj = self.env['product.configurator']
         wizard = wizard_obj.create({
-            'product_modifiable': False,
-            'product_force_create': True,
+            'modify_variant': False,
             'product_tmpl_id': self.id,
             'state': active_step,
             'last_step': last_step,

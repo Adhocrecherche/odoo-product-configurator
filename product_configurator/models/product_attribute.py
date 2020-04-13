@@ -60,7 +60,7 @@ class ProductAttribute(models.Model):
         help='The type of the custom field generated in the frontend'
     )
 
-    description = fields.Text(string='Description', translate=True)
+    description = fields.Text(string='Description', translate=False)
 
     search_ok = fields.Boolean(
         string='Searchable',

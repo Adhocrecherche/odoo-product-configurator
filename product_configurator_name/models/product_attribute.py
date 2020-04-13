@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-from odoo import fields, models
+from odoo import fields, models, _
 
-DISPLAY_SELECTION = [('hide', 'Hide'), ('value', 'Only Value'), ('attribute', 'With Label')]
+DISPLAY_SELECTION = [('hide', _('Hide')), ('value', _('Only Value')), ('attribute', _('With Label'))]
 
 
 class ProductAttributeLine(models.Model):
@@ -10,7 +10,7 @@ class ProductAttributeLine(models.Model):
     _order = 'product_tmpl_id, sequence, id'
 
     sequence = fields.Integer(string='Sequence', default=10)
-    display_mode = fields.Selection(DISPLAY_SELECTION, default='value', required=True)
+    display_mode = fields.Selection([('hide', _('Hide')), ('value', _('Only Value')), ('attribute', _('With Label'))], default='value', required=True)
 
     def display_format(self):
         result = []
