@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="product_configurator_form" model="ir.ui.view">
+        <field name="name">product.configurator</field>
+        <field name="model">product.configurator</field>
+        <field name="inherit_id" ref="product_configurator_wizard.product_configurator_form"/>
+        <field name="arch" type="xml">
+            <group name='static_form' position="replace">
+                <group name='static_form' colspan="3" states='select'>
+                    <field name="search_filter"/>
+                    <field name="mpn_ids" invisible="1"/>
+                    <field name="manufacturer_id"
+                        context="{'default_attribute_id': %(product_configurator_search.attribute_manufacturer)d}"/>
+                    <field name="product_tmpl_id" required="True"/>
+                    <field name="product_id"/>
+                </group>
+            </group>
+        </field>
+    </record>
+
+</odoo>

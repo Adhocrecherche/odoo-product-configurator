@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<openerp>
+    <data>
+
+        <record id="attribute_mpn" model="product.attribute">
+            <field name="name">Manufacturer Part Number</field>
+        </record>
+
+        <record id="attribute_manufacturer" model="product.attribute">
+            <field name="name">Manufacturer</field>
+        </record>
+
+    </data>
+</openerp>
