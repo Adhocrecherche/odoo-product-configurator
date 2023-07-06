@@ -6,7 +6,7 @@ DISPLAY_SELECTION = [('hide', _('Hide')), ('value', _('Only Value')), ('attribut
 
 
 class ProductAttributeLine(models.Model):
-    _inherit = 'product.attribute.line'
+    _inherit = 'product.template.attribute.line'
     _order = 'product_tmpl_id, sequence, id'
 
     sequence = fields.Integer(string='Sequence', default=10)

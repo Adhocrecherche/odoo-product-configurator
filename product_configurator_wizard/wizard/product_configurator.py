@@ -288,7 +288,7 @@ class ProductConfigurator(models.TransientModel):
         return {'value': vals, 'domain': domains}
 
     attribute_line_ids = fields.One2many(
-        comodel_name='product.attribute.line',
+        comodel_name='product.template.attribute.line',
         related='product_tmpl_id.attribute_line_ids',
         string="Attributes",
         readonly=True,

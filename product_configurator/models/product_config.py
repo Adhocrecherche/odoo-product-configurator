@@ -155,7 +155,7 @@ class ProductConfigLine(models.Model):
     )
 
     attribute_line_id = fields.Many2one(
-        comodel_name='product.attribute.line',
+        comodel_name='product.template.attribute.line',
         string='Attribute Line',
         ondelete='cascade',
         required=True
@@ -311,7 +311,7 @@ class ProductConfigStepLine(models.Model):
         required=True
     )
     attribute_line_ids = fields.Many2many(
-        comodel_name='product.attribute.line',
+        comodel_name='product.template.attribute.line',
         relation='config_step_line_attr_id_rel',
         column1='cfg_line_id',
         column2='attr_id',

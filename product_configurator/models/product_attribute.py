@@ -136,7 +136,7 @@ class ProductAttribute(models.Model):
 
 
 class ProductAttributeLine(models.Model):
-    _inherit = 'product.attribute.line'
+    _inherit = 'product.template.attribute.line'
 
     @api.onchange('attribute_id')
     def onchange_attribute(self):
@@ -180,7 +180,7 @@ class ProductAttributeValue(models.Model):
             product_tmpl_id = self.env.context.get('product_tmpl_id')
             attribute_id = vals.get('attribute_id',
                                     self.env.context.get('default_attribute_id'))
-            line = self.env['product.attribute.line'].search([
+            line = self.env['product.template.attribute.line'].search([
                 ('product_tmpl_id', '=', product_tmpl_id),
                 ('attribute_id', '=', attribute_id)])
             match = line.attribute_id.value_ids.filtered(lambda rec: rec.name == vals['name'])
