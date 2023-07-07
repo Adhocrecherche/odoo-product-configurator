@@ -84,7 +84,7 @@ class ProductAttribute(models.Model):
     )
 
     uom_id = fields.Many2one(
-        comodel_name='product.uom',
+        comodel_name='uom.uom',
         string='Unit of Measure'
     )
 
