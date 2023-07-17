@@ -59,10 +59,28 @@
                         <field name="value_ids"
                                widget="many2many_tags"
                                attrs="{'readonly': [('attribute_line_id','=',False)]}"
-                               domain="[('id','in',attr_line_val_ids[0][2])]"
+                               domain="[('id','in',attr_line_val_ids)]"
                                options="{'no_create': True, 'no_create_edit': True}"
                                context="{'show_attribute': False}"/>
                         <field name="domain_id"/>
+                    </tree>
+                </field>
+                <separator colspan="4" string="Configuration Defaults"/>
+                <field name="config_default_ids"
+                       attrs="{'readonly': [('attribute_line_ids','=',[])]}"
+                       context="{'show_attribute': True, 'for_template_id': id}">
+                    <tree string="Attribute Value Defaults" editable="bottom">
+                        <field name="sequence" widget="handle"/>
+                        <field name="domain_id"/>
+                        <!-- # TODO: Find a more elegant way to restrict the value_ids -->
+                        <field name="attr_line_val_ids"
+                               widget="many2many_tags"
+                               invisible="True"/>
+                        <field name="value_ids"
+                               widget="many2many_tags"
+                               domain="[('id','in',attr_line_val_ids)]"
+                               options="{'no_create': True, 'no_create_edit': True}"
+                               context="{'show_attribute': True}"/>
                     </tree>
                 </field>
                 <separator colspan="4" string="Configuration Steps"/>
@@ -82,7 +100,7 @@
                     <tree editable="bottom" string="Configuration Images">
                         <field name="sequence" widget="handle"/>
                         <field name="name"/>
-                        <field name="image" widget="image" height="30px"/>
+                        <field name="image" height="30px"/>
                         <field name="value_ids" widget="many2many_tags" context="{'_cfg_product_tmpl_id': parent.id}"/>
                     </tree>
                 </field>
@@ -121,19 +139,6 @@
                     </field> -->
                 </page>
             </xpath>
-            <xpath expr="//field[@name='name']" position="attributes">
-                <attribute name="invisible">context.get('default_config_ok')</attribute>
-            </xpath>
-            <xpath expr="//field[@name='name']" position="after">
-                <field name="config_name" placeholder="Product Name" invisible="not context.get('default_config_ok')"/>
-            </xpath>
-            <xpath expr="//label[@for='name']" position="attributes">
-                <attribute name="invisible">context.get('default_config_ok')</attribute>
-            </xpath>
-            <xpath expr="//label[@for='name']" position="after">
-                <label class="oe_edit_only" for="config_name" string="Product Name" invisible="not context.get('default_config_ok')"/>
-            </xpath>
-
         </field>
     </record>
 

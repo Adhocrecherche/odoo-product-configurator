@@ -4,11 +4,18 @@ from lxml import etree
 
 from odoo.osv import orm
 from odoo import models, fields, api, _
-from odoo.exceptions import Warning, ValidationError
+from odoo.exceptions import ValidationError
+
+
+FIELD_TYPES = [(key, key) for key in sorted(fields.Field.by_type)]
+
+
+def m2o_convert_to_read(value_id, use_name_get=True):
+    return fields.Many2one.convert_to_read(
+        None, value_id, None, use_name_get=use_name_get)
 
 
 class FreeSelection(fields.Selection):
-
     def convert_to_cache(self, value, record, validate=True):
         return super(FreeSelection, self).convert_to_cache(
             value=value, record=record, validate=False)
@@ -109,10 +116,12 @@ class ProductConfigurator(models.TransientModel):
                     continue
         return domains
 
-    def get_form_vals(self, dynamic_fields, domains):
+    def get_form_vals(self, dynamic_fields, domains, cfg_step):
         """Generate a dictionary to return new values via onchange method.
         Domains hold the values available, this method enforces these values
         if a selection exists in the view that is not available anymore.
+        Also, if there are values blanked out by this, then try and see if
+        there is an available default.
 
         :param dynamic_fields: Dictionary with the current {dynamic_field: val}
         :param domains: Odoo domains restricting attribute values
@@ -121,22 +130,63 @@ class ProductConfigurator(models.TransientModel):
         """
         vals = {}
 
-        dynamic_fields = {k: v for k, v in dynamic_fields.iteritems() if v}
+        dynamic_fields = dynamic_fields.copy()
 
-        for k, v in dynamic_fields.iteritems():
-            if not v:
-                continue
+        # validate and eliminate values, and set defaults if they are on the
+        # current step
+        step_val_ids = cfg_step and \
+            cfg_step.attribute_line_ids.mapped('value_ids').ids or \
+            self.product_tmpl_id.attribute_line_ids.mapped('value_ids').ids
+        for k, v in dynamic_fields.items():
             available_val_ids = domains[k][0][2]
+            # Get this fresh every time as the loop can change the values as
+            # it goes!
+            config_val_ids = [dfv[0] for dfv in dynamic_fields.values()
+                              if isinstance(dfv, tuple)]
+            for list_dfv in [dfv for dfv in dynamic_fields.values()
+                             if dfv and isinstance(dfv, list)]:
+                config_val_ids.extend(list_dfv)
+            if not v:
+                # if the value currently is blank and on the current step, see
+                # if one can be set
+                if set(available_val_ids) & set(step_val_ids):
+                    def_value_id = self.product_tmpl_id.find_default_value(
+                        available_val_ids, config_val_ids
+                    )
+                    if def_value_id:
+                        dynamic_fields.update({k: def_value_id})
+                        vals[k] = def_value_id
+                continue
             if isinstance(v, list):
-                value_ids = list(set(v[0][2]) & set(available_val_ids))
-                dynamic_fields.update({k: value_ids})
+                # must handle both cases in [7, [6, False, []]]
+                flattened = []
+                for sel_val_id in v:
+                    if type(sel_val_id) == list:
+                        flattened.extend(sel_val_id[2])
+                    else:
+                        flattened.append(sel_val_id)
+                value_ids = list(set(flattened) & set(available_val_ids))
+                dynamic_fields[k] = [[6, 0, value_ids]]
                 vals[k] = [[6, 0, value_ids]]
-            elif v not in available_val_ids:
-                dynamic_fields.update({k: None})
-                vals[k] = None
+            elif v[0] not in available_val_ids:
+                # if the value is to be blanked, and it is on the current
+                # step, see if a default can be set
+                if set(available_val_ids) & set(step_val_ids):
+                    def_value_id = self.product_tmpl_id.find_default_value(
+                        available_val_ids, config_val_ids
+                    ) or None
+                else:
+                    def_value_id = None
+                dynamic_fields.update({k: def_value_id})
+                vals[k] = def_value_id
 
+        config_val_ids = [dfv for dfv in dynamic_fields.values()
+                          if dfv and not isinstance(dfv, list)]
+        for list_dfv in [dfv for dfv in dynamic_fields.values()
+                         if dfv and isinstance(dfv, list)]:
+            config_val_ids.extend(list_dfv[0][2])
         product_img = self.product_tmpl_id.get_config_image_obj(
-            dynamic_fields.values())
+            config_val_ids)
 
         vals.update(product_img=product_img.image)
 
@@ -166,13 +216,20 @@ class ProductConfigurator(models.TransientModel):
         except:
             cfg_step = self.env['product.config.step.line']
 
+        def _convert_to_read(v):
+            if isinstance(v, list):
+                return v
+            if isinstance(v, int):
+                return m2o_convert_to_read(
+                    self.env['product.attribute.value'].browse(v))
+
         dynamic_fields = {
-            k: v for k, v in values.iteritems() if k.startswith(
-                self.field_prefix)
+            k: _convert_to_read(v) for k, v in values.items()
+            if k.startswith(self.field_prefix)
         }
 
         # Get the unstored values from the client view
-        for k, v in dynamic_fields.iteritems():
+        for k, v in dynamic_fields.items():
             attr_id = int(k.split(self.field_prefix)[1])
             line_attributes = cfg_step.attribute_line_ids.mapped(
                 'attribute_id')
@@ -186,6 +243,8 @@ class ProductConfigurator(models.TransientModel):
                 view_val_ids |= set(v[0][2])
             elif isinstance(v, int):
                 view_val_ids.add(v)
+            elif isinstance(v, tuple):
+                view_val_ids.add(v[0])
 
         # Clear all DB values belonging to attributes changed in the wizard
         cfg_vals = cfg_vals.filtered(
@@ -196,7 +255,36 @@ class ProductConfigurator(models.TransientModel):
         cfg_val_ids = cfg_vals.ids + list(view_val_ids)
 
         domains = self.get_onchange_domains(values, cfg_val_ids)
-        vals = self.get_form_vals(dynamic_fields, domains)
+        vals = self.get_form_vals(dynamic_fields, domains, cfg_step)
+        modified_dynamics = {k: v
+                             for k, v in vals.items()
+                             if k in dynamic_fields}
+
+        while modified_dynamics:
+            # modified values may change domains!
+            dynamic_fields.update(modified_dynamics)
+            for k, v in modified_dynamics.items():
+                attr_id = int(k.split(self.field_prefix)[1])
+                view_val_ids -= set(self.env['product.attribute.value'].search(
+                    [('attribute_id', '=', attr_id)]).ids)
+                if v:
+                    if isinstance(v, list):
+                        view_val_ids |= set(v[0][2])
+                    elif isinstance(v, int):
+                        view_val_ids.add(v)
+                    elif isinstance(v, tuple):
+                        view_val_ids.add(v[0])
+
+            cfg_val_ids = cfg_vals.ids + list(view_val_ids)
+
+            domains = self.get_onchange_domains(values, cfg_val_ids)
+            nvals = self.get_form_vals(dynamic_fields, domains, cfg_step)
+            # Stop possible recursion by not including values which have
+            # previously looped
+            modified_dynamics = {k: v
+                                 for k, v in nvals.items()
+                                 if k in dynamic_fields and k not in vals}
+            vals.update(nvals)
         return {'value': vals, 'domain': domains}
 
     attribute_line_ids = fields.One2many(
@@ -273,6 +361,8 @@ class ProductConfigurator(models.TransientModel):
             # If no configuration steps exist then get all attribute lines
             attribute_lines = wiz.product_tmpl_id.attribute_line_ids
 
+        # TODO: If last block is attempting to be clever, this next
+        # line is ignoring it.  Need to determine what is best.
         attribute_lines = wiz.product_tmpl_id.attribute_line_ids
 
         # Generate relational fields with domains restricting values to
@@ -280,15 +370,18 @@ class ProductConfigurator(models.TransientModel):
 
         # Default field attributes
         default_attrs = {
-            'company_dependent': False,
-            'depends': (),
-            'groups': False,
-            'readonly': False,
-            'manual': False,
-            'required': False,
-            'searchable': False,
-            'store': False,
-            'translate': False,
+            # FIX-11 no bug behind change, load_views typical values
+            'change_default' : False,
+            'company_dependent' : False,
+            'context' : {},
+            'depends' : [],
+            'domain' : [],
+            'manual' : False,
+            'readonly' : False,
+            'required' : False,
+            'searchable' : True,
+            'sortable' : True,
+            'store' : True,
         }
 
         for line in attribute_lines:
@@ -307,14 +400,14 @@ class ProductConfigurator(models.TransientModel):
 
                 # Set default field type
                 field_type = 'char'
-                field_types = self.env['ir.model.fields']._get_field_types()
+                # FIX-11 _get_field_types() removed, using FIELD_TYPES
 
                 if attribute.custom_type:
                     custom_type = line.attribute_id.custom_type
                     # TODO: Rename int to integer in values
                     if custom_type == 'int':
                         field_type = 'integer'
-                    elif custom_type in [f[0] for f in field_types]:
+                    elif custom_type in [f[0] for f in FIELD_TYPES]:
                         field_type = custom_type
 
                 # TODO: Implement custom string on custom attribute
@@ -358,7 +451,7 @@ class ProductConfigurator(models.TransientModel):
         # Get updated fields including the dynamic ones
         fields = self.fields_get()
         dynamic_fields = {
-            k: v for k, v in fields.iteritems() if k.startswith(
+            k: v for k, v in fields.items() if k.startswith(
                 self.field_prefix) or k.startswith(self.custom_field_prefix)
         }
 
@@ -368,6 +461,26 @@ class ProductConfigurator(models.TransientModel):
         # Update result dict from super with modified view
         res.update({'arch': etree.tostring(mod_view)})
 
+        # set any default values
+        wiz_vals = wiz.read(dynamic_fields.keys())[0]
+        dynamic_field_vals = {
+            k: wiz_vals.get(
+                k, [] if v['type'] == 'many2many' else False
+                )
+            for k, v in fields.items()
+            if k.startswith(self.field_prefix)
+        }
+        domains = {k: dynamic_fields[k]['domain']
+                   for k in dynamic_field_vals.keys()}
+        try:
+            cfg_step_id = int(wiz.state)
+            cfg_step = wiz.product_tmpl_id.config_step_line_ids.filtered(
+                lambda x: x.id == cfg_step_id)
+        except:
+            cfg_step = self.env['product.config.step.line']
+        vals = wiz.get_form_vals(dynamic_field_vals, domains, cfg_step)
+        if vals:
+            wiz.write(vals)
         return res
 
     @api.model
@@ -463,7 +576,7 @@ class ProductConfigurator(models.TransientModel):
                         val_ids = val_ids - domain_line.value_ids
                         attr_depends[attr_field] |= set(val_ids.ids)
 
-                for dependee_field, val_ids in attr_depends.iteritems():
+                for dependee_field, val_ids in attr_depends.items():
                     if not val_ids:
                         continue
                     attrs['readonly'].append(
@@ -480,8 +593,8 @@ class ProductConfigurator(models.TransientModel):
                 attrs=str(attrs),
                 context="{'show_attribute': False}",
                 options=str({
-                    'no_create': True,
-                    'no_create_edit': True,
+                    'no_create': not attr_line.attribute_id.create_on_the_fly,
+                    'no_create_edit': not attr_line.attribute_id.create_on_the_fly,
                     'no_open': True
                 })
             )
@@ -535,7 +648,8 @@ class ProductConfigurator(models.TransientModel):
         This is used in reconfiguration of a existing variant"""
         vals.update(user_id=self.env.uid)
 
-        if 'product_id' in vals:
+        # FIX-11 key present with False value
+        if vals.get('product_id'):
             product = self.env['product.product'].browse(vals['product_id'])
             vals.update({
                 'product_tmpl_id': product.product_tmpl_id.id,
@@ -566,7 +680,6 @@ class ProductConfigurator(models.TransientModel):
 
         custom_ext_id = 'product_configurator.custom_attribute_value'
         custom_val = self.env.ref(custom_ext_id)
-        dynamic_vals = {}
 
         res = super(ProductConfigurator, self).read(fields=fields, load=load)
 
@@ -580,19 +693,23 @@ class ProductConfigurator(models.TransientModel):
             if field_name not in dynamic_fields:
                 continue
 
-            custom_field_name = self.custom_field_prefix + str(attr_id)
-            custom_vals = self.custom_value_ids.filtered(
-                lambda x: x.attribute_id.id == attr_id)
+            # FIX-11 refactor
+            # - all m2o keys must be present
+            #   error at _parseServerData() in basic_model.js
+            # - ids expect [1,2]
+            #   _browse() display_name receives _ids = ([6, 0, []],)
+            # - m2o expects (1, 'name')
+            #   nothing to display
+            dynamic_vals = {}
             vals = attr_line.value_ids.filtered(
                 lambda v: v in self.value_ids)
 
-            if not attr_line.custom and not vals:
-                continue
+            # set custom value
+            if attr_line.custom:
+                custom_field_name = self.custom_field_prefix + str(attr_id)
+                custom_vals = self.custom_value_ids.filtered(
+                    lambda x: x.attribute_id.id == attr_id)
 
-            if attr_line.custom and custom_vals:
-                dynamic_vals.update({
-                    field_name: custom_val.id,
-                })
                 if attr_line.attribute_id.custom_type == 'binary':
                     dynamic_vals.update({
                         custom_field_name: custom_vals.eval()
@@ -601,13 +718,25 @@ class ProductConfigurator(models.TransientModel):
                     dynamic_vals.update({
                         custom_field_name: custom_vals.eval()
                     })
-            elif attr_line.multi:
-                dynamic_vals = {field_name: [[6, 0, vals.ids]]}
+                if custom_vals:
+                    # override field value
+                    vals = custom_val
+
+            # set field value
+            if attr_line.multi:
+                # FIX-11 _browse() display_name receives _ids = ([6, 0, []],)
+                dynamic_vals.update({field_name: vals.ids})
+            elif not vals:
+                dynamic_vals.update({field_name: False})
             else:
                 try:
                     vals.ensure_one()
-                    dynamic_vals = {field_name: vals.id}
-                except:
+                    # FIX-11 empty values (display_name) in reconfigure
+                    value = m2o_convert_to_read(vals,
+                        use_name_get=(load == '_classic_read'))
+                    dynamic_vals.update({field_name: value})
+                except ValueError:
+                    # ensure_one() failed
                     continue
             res[0].update(dynamic_vals)
         return res
@@ -644,9 +773,12 @@ class ProductConfigurator(models.TransientModel):
                         field_val = vals[field_name][0][2]
                 elif not attr_line.multi and isinstance(vals[field_name], int):
                     field_val = vals[field_name]
+                elif not attr_line.multi and isinstance(vals[field_name], tuple):
+                    # patch for fields_view_get()
+                    field_val = vals[field_name][0]
                 else:
                     raise Warning(
-                        _('An error occursed while parsing value for '
+                        _('An error occurred while parsing value for '
                           'attribute %s' % attr_line.attribute_id.name)
                     )
                 attr_val_dict.update({
@@ -700,12 +832,11 @@ class ProductConfigurator(models.TransientModel):
         wizard_action = {
             'type': 'ir.actions.act_window',
             'res_model': self._name,
-            'name': "Configure Product",
+            'name': _("Configure Product"),
             'view_mode': 'form',
             'context': dict(
                 self.env.context,
                 wizard_id=self.id,
-                view_cache=False,
             ),
             'target': 'new',
             'res_id': self.id,
@@ -717,11 +848,11 @@ class ProductConfigurator(models.TransientModel):
         cfg_step_lines = self.product_tmpl_id.config_step_line_ids
 
         if not cfg_step_lines:
-            if self.value_ids:
-                return self.action_config_done()
-            else:
+            # FIX-11 general fix - step-less, all custom must complete
+            if self.state == 'select':
                 self.state = 'configure'
                 return wizard_action
+            return self.action_config_done()
 
         try:
             cfg_step_line_id = int(self.state)
@@ -752,12 +883,11 @@ class ProductConfigurator(models.TransientModel):
         wizard_action = {
             'type': 'ir.actions.act_window',
             'res_model': self._name,
-            'name': "Configure Product",
+            'name': _("Configure Product"),
             'view_mode': 'form',
             'context': dict(
                 self.env.context,
                 wizard_id=self.id,
-                view_cache=False,
             ),
             'target': 'new',
             'res_id': self.id,
@@ -818,12 +948,18 @@ class ProductConfigurator(models.TransientModel):
                 self.value_ids.ids, custom_vals)
         except ValidationError:
             raise
-        except:
+        except Exception as e:
             raise ValidationError(
                 _('Invalid configuration! Please check all '
                   'required steps and fields.')
             )
 
+        self.action_config_done_postprocess(variant)
+        self.unlink()
+
+    @api.multi
+    def action_config_done_postprocess(self, variant):
+        """ hook to update active record before wizard is deleted """
         so = self.env['sale.order'].browse(self.env.context.get('active_id'))
 
         line_vals = {'product_id': variant.id}
@@ -835,9 +971,6 @@ class ProductConfigurator(models.TransientModel):
             self.order_line_id.write(line_vals)
         else:
             so.write({'order_line': [(0, 0, line_vals)]})
-
-        self.unlink()
-        return
 
 
 class ProductConfiguratorCustomValue(models.TransientModel):

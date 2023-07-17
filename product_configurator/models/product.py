@@ -3,6 +3,7 @@
 from odoo.tools.misc import formatLang
 from odoo.exceptions import ValidationError
 from odoo import models, fields, api, tools, _
+from lxml import etree
 
 
 class ProductTemplate(models.Model):
@@ -14,6 +15,12 @@ class ProductTemplate(models.Model):
         comodel_name='product.config.line',
         inverse_name='product_tmpl_id',
         string="Attribute Dependencies"
+    )
+
+    config_default_ids = fields.One2many(
+        comodel_name='product.config.default',
+        inverse_name='product_tmpl_id',
+        string="Attribute Defaults"
     )
 
     config_image_ids = fields.One2many(
@@ -220,6 +227,8 @@ class ProductTemplate(models.Model):
         """
         self.ensure_one()
 
+        # TODO search finds any match with same 2+ custom attributes
+
         if custom_values is None:
             custom_values = {}
         attr_obj = self.env['product.attribute']
@@ -234,7 +243,7 @@ class ProductTemplate(models.Model):
             ('custom_type', 'not in', attr_obj._get_nosearch_fields())
         ])
 
-        for attr_id, value in custom_values.iteritems():
+        for attr_id, value in custom_values.items():
             if attr_id not in attr_search.ids:
                 domain.append(
                     ('value_custom_ids.attribute_id', '!=', int(attr_id)))
@@ -289,11 +298,12 @@ class ProductTemplate(models.Model):
         binary_attribute_ids = attr_obj.search([
             ('custom_type', '=', 'binary')]).ids
 
-        custom_lines = []
+        # remove all previous custom values
+        custom_lines = [(5, 0, {})]
 
-        for key, val in custom_values.iteritems():
+        for key, val in custom_values.items():
             custom_vals = {'attribute_id': key}
-            # TODO: Is this extra check neccesairy as we already make
+            # TODO: Is this extra check necessary as we already make
             # the check in validate_configuration?
             attr_obj.browse(key).validate_custom_val(val)
             if key in binary_attribute_ids:
@@ -382,6 +392,13 @@ class ProductTemplate(models.Model):
         return variant
 
     def validate_domains_against_sels(self, domains, sel_val_ids):
+        # must handle both cases in [7, [6, False, []]]
+        flattened = []
+        for sel_val_id in sel_val_ids:
+            if type(sel_val_id) == list:
+                flattened.extend(sel_val_id[2])
+            else:
+                flattened.append(sel_val_id)
         # process domains as shown in this wikipedia pseudocode:
         # https://en.wikipedia.org/wiki/Polish_notation#Order_of_operations
         stack = []
@@ -389,11 +406,11 @@ class ProductTemplate(models.Model):
             if type(domain) == tuple:
                 # evaluate operand and push to stack
                 if domain[1] == 'in':
-                    if not set(domain[2]) & set(sel_val_ids):
+                    if not set(domain[2]) & set(flattened):
                         stack.append(False)
                         continue
                 else:
-                    if set(domain[2]) & set(sel_val_ids):
+                    if set(domain[2]) & set(flattened):
                         stack.append(False)
                         continue
                 stack.append(True)
@@ -437,6 +454,49 @@ class ProductTemplate(models.Model):
                 avail_val_ids.append(attr_val_id)
 
         return avail_val_ids
+
+    @api.multi
+    def find_default_value(self, selectable_value_ids, value_ids):
+        """Based on the current values, which of the available template value ids
+            is the best default value to use.
+
+            :param selectable_value_ids: list of product.attribute.value
+                object already trimmed down as selectable, for one
+                attribute line.
+            :param value_ids: list of attribute value ids already chosen
+
+            :returns: The first matched default (id, display_name)
+
+        """
+        self.ensure_one()
+
+        if not selectable_value_ids:
+            return False
+        # assume all values are from the same attribute line - they should be!
+        default_lines = self.config_default_ids.filtered(
+            lambda l: set(l.value_ids.ids) & set(selectable_value_ids)
+        )
+
+        for default_line in default_lines:
+            if not default_line.domain_id:
+                # No domain - always considered true. Use this.
+                break
+            domains = default_line.mapped('domain_id').compute_domain()
+            if self.validate_domains_against_sels(domains, value_ids):
+                # Domain OK, use this
+                break
+        else:
+            # parsed all lines without a match
+            return False
+        # pick one at random...
+        return next(
+            ((value_id.id, value_id.display_name)
+                for value_id in default_line.value_ids
+                if value_id.id in selectable_value_ids),
+            False)
+        return (
+            set(default_line.value_ids.ids) & set(selectable_value_ids)
+        ).pop()
 
     @api.multi
     def validate_configuration(self, value_ids, custom_vals=None, final=True):
@@ -609,7 +669,7 @@ class ProductProduct(models.Model):
         comodel_name='product.attribute.value.custom',
         inverse_name='product_id',
         string='Custom Values',
-        readonly=True
+        readonly=True,
     )
 
     @api.multi
@@ -620,6 +680,33 @@ class ProductProduct(models.Model):
     _constraints = [
         (_check_attribute_value_ids, None, ['attribute_value_ids'])
     ]
+
+    @api.model
+    def fields_view_get(self, view_id=None, view_type='form',
+                        toolbar=False, submenu=False):
+        """ For configurable products switch the name field with the config_name
+            so as to keep the view intact in whatever form it is at the moment
+            of execution and not duplicate the original just for the sole
+            purpose of displaying the proper name"""
+        res = super(ProductProduct, self).fields_view_get(
+            view_id=view_id, view_type=view_type,
+            toolbar=toolbar, submenu=submenu
+        )
+        if self.env.context.get('default_config_ok'):
+            xml_view = etree.fromstring(res['arch'])
+            xml_name = xml_view.xpath("//field[@name='name']")
+            xml_label = xml_view.xpath("//label[@for='name']")
+            if xml_name:
+                xml_name[0].attrib['name'] = 'config_name'
+                if xml_label:
+                    xml_label[0].attrib['for'] = 'config_name'
+                view_obj = self.env['ir.ui.view']
+                xarch, xfields = view_obj.postprocess_and_fields(self._name,
+                                                                 xml_view,
+                                                                 view_id)
+                res['arch'] = xarch
+                res['fields'] = xfields
+        return res
 
     # TODO: Implement naming method for configured products
     # TODO: Provide a field with custom name in it that defaults to a name
