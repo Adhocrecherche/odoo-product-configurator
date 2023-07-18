@@ -1,21 +1,15 @@
+# -*- coding: utf-8 -*-
+
 from odoo.tests.common import TransactionCase
-from odoo.exceptions import ValidationError
-from odoo import SUPERUSER_ID
 
 
 class ConfigurationRules(TransactionCase):
 
     def setUp(self):
         super(ConfigurationRules, self).setUp()
-
         self.cfg_tmpl = self.env.ref('product_configurator.bmw_2_series')
-        self.cfg_session = self.env['product.config.session'].create({
-            'product_tmpl_id': self.cfg_tmpl.id,
-            'user_id': SUPERUSER_ID
-        })
 
         attribute_vals = self.cfg_tmpl.attribute_line_ids.mapped('value_ids')
-        self.attr_vals = self.cfg_tmpl.attribute_line_ids.mapped('value_ids')
 
         self.attr_val_ext_ids = {
             v: k for k, v in attribute_vals.get_external_id().items()
@@ -48,7 +42,7 @@ class ConfigurationRules(TransactionCase):
         ]
 
         attr_val_ids = self.get_attr_val_ids(conf)
-        validation = self.cfg_session.validate_configuration(attr_val_ids)
+        validation = self.cfg_tmpl.validate_configuration(attr_val_ids)
         self.assertTrue(validation, "Valid configuration failed validation")
 
     def test_invalid_configuration(self):
@@ -59,8 +53,9 @@ class ConfigurationRules(TransactionCase):
         ]
 
         attr_val_ids = self.get_attr_val_ids(conf)
-        with self.assertRaises(ValidationError):
-            self.cfg_session.validate_configuration(attr_val_ids)
+        validation = self.cfg_tmpl.validate_configuration(attr_val_ids)
+        self.assertFalse(validation, "Incompatible values (Diesel Fuel -> "
+                         "Gasoline Engine) configuration passed validation")
 
     def test_missing_val_configuration(self):
         conf = [
@@ -69,8 +64,9 @@ class ConfigurationRules(TransactionCase):
         ]
 
         attr_val_ids = self.get_attr_val_ids(conf)
-        with self.assertRaises(ValidationError):
-            self.cfg_session.validate_configuration(attr_val_ids)
+        validation = self.cfg_tmpl.validate_configuration(attr_val_ids)
+        self.assertFalse(validation, "Configuration with missing required "
+                         "values passed validation")
 
     def test_invalid_multi_configuration(self):
         conf = [
@@ -80,8 +76,9 @@ class ConfigurationRules(TransactionCase):
         ]
 
         attr_val_ids = self.get_attr_val_ids(conf)
-        with self.assertRaises(ValidationError):
-            self.cfg_session.validate_configuration(attr_val_ids)
+        validation = self.cfg_tmpl.validate_configuration(attr_val_ids)
+        self.assertFalse(validation, "Configuration with multiple values for "
+                         "attribute color passed validation")
 
     def test_invalid_custom_value_configuration(self):
         conf = [
@@ -98,8 +95,49 @@ class ConfigurationRules(TransactionCase):
         }
 
         attr_val_ids = self.get_attr_val_ids(conf)
-        with self.assertRaises(ValidationError):
-            self.cfg_session.validate_configuration(
-                attr_val_ids, custom_vals)
+        validation = self.cfg_tmpl.validate_configuration(
+            attr_val_ids, custom_vals)
 
-    # TODO: Test configuration with disallowed custom type value
+        self.assertFalse(validation, "Custom value accepted for fixed "
+                         "attribute color")
+
+    def test_configuration_defaults(self):
+        conf = ['gasoline', 'tapistry_black']
+        engine_selections = self.env.ref(
+            'product_configurator.product_config_line_gasoline_engines'
+        )
+        attr_val_ids = self.get_attr_val_ids(conf)
+        default_value_engine = self.cfg_tmpl.find_default_value(
+            engine_selections.value_ids.ids,
+            attr_val_ids,
+        )
+        self.assertEqual(
+            [default_value_engine and default_value_engine[0]],
+            self.get_attr_val_ids(['218i']),
+            "Gasoline Engine default not set correctly"
+        )
+
+        color_selection_ids = self.get_attr_val_ids(['red', 'silver', 'black'])
+        attr_val_ids = self.get_attr_val_ids(conf)
+        default_value_color = self.cfg_tmpl.find_default_value(
+            color_selection_ids,
+            attr_val_ids,
+        )
+        self.assertEqual(
+            [default_value_color and default_value_color[0]],
+            self.get_attr_val_ids(['red']),
+            "Gasoline Color default not set correctly"
+        )
+
+        color_selection_ids = self.get_attr_val_ids(['silver', 'black'])
+        attr_val_ids = self.get_attr_val_ids(conf)
+        default_value_color = self.cfg_tmpl.find_default_value(
+            color_selection_ids,
+            attr_val_ids,
+        )
+        self.assertFalse(
+            default_value_color,
+            "Gasoline Color should not have been returned unselectable value"
+        )
+
+    # Test configuration with disallowed custom type value

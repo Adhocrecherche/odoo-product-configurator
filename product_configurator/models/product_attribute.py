@@ -1,8 +1,10 @@
+# -*- coding: utf-8 -*-
+
+from odoo import models, fields, api, _
+from odoo.exceptions import ValidationError
 from ast import literal_eval
 
-from odoo import models, fields, api, _, tools
-from odoo.exceptions import ValidationError
-from odoo.addons import decimal_precision as dp
+# TODO: Implement a default attribute value field/method to load up on wizard
 
 
 class ProductAttribute(models.Model):
@@ -10,13 +12,10 @@ class ProductAttribute(models.Model):
 
     @api.multi
     def copy(self, default=None):
-        if not default:
-            default = {}
-        new_attrs = self.env['product.attribute']
         for attr in self:
             default.update({'name': attr.name + " (copy)"})
-            new_attrs += super(ProductAttribute, attr).copy(default)
-        return new_attrs
+            attr = super(ProductAttribute, attr).copy(default)
+            return attr
 
     @api.model
     def _get_nosearch_fields(self):
@@ -27,14 +26,6 @@ class ProductAttribute(models.Model):
     def onchange_custom_type(self):
         if self.custom_type in self._get_nosearch_fields():
             self.search_ok = False
-        if self.custom_type not in ('int', 'float'):
-            self.min_val = False
-            self.max_val = False
-
-    @api.onchange('val_custom')
-    def onchange_val_custom_field(self):
-        if not self.val_custom:
-            self.custom_type = False
 
     CUSTOM_TYPES = [
         ('char', 'Char'),
@@ -69,7 +60,7 @@ class ProductAttribute(models.Model):
         help='The type of the custom field generated in the frontend'
     )
 
-    description = fields.Text(string='Description', translate=True)
+    description = fields.Text(string='Description', translate=False)
 
     search_ok = fields.Boolean(
         string='Searchable',
@@ -77,6 +68,7 @@ class ProductAttribute(models.Model):
         'the same configuration, do we '
         'include this field in the search?'
     )
+
     required = fields.Boolean(
         string='Required',
         default=True,
@@ -84,16 +76,24 @@ class ProductAttribute(models.Model):
         'attribute though it can be change on '
         'the template level'
     )
+
     multi = fields.Boolean(
         string="Multi",
         help='Allow selection of multiple values for '
         'this attribute?'
     )
+
     uom_id = fields.Many2one(
         comodel_name='product.uom',
         string='Unit of Measure'
     )
+
     image = fields.Binary(string='Image')
+
+    create_on_the_fly = fields.Boolean(
+        string='Can create value on the fly',
+        help='User can create new value with product configurator'
+    )
 
     # TODO prevent the same attribute from being defined twice on the
     # attribute lines
@@ -117,7 +117,7 @@ class ProductAttribute(models.Model):
         if self.custom_type in ('int', 'float'):
             minv = self.min_val
             maxv = self.max_val
-            val = literal_eval(str(val))
+            val = literal_eval(val)
             if minv and maxv and (val < minv or val > maxv):
                 raise ValidationError(
                     _("Selected custom value '%s' must be between %s and %s"
@@ -134,16 +134,6 @@ class ProductAttribute(models.Model):
                         (self.name, self.max_val + 1))
                 )
 
-    @api.constrains('min_val', 'max_val')
-    def _check_constraint_min_max_value(self):
-        if self.custom_type not in ('int', 'float'):
-            return
-        minv = self.min_val
-        maxv = self.max_val
-        if maxv and minv and maxv < minv:
-            raise ValidationError(
-                _("Maximum value must be greater than Minimum value"))
-
 
 class ProductAttributeLine(models.Model):
     _inherit = 'product.attribute.line'
@@ -152,15 +142,8 @@ class ProductAttributeLine(models.Model):
     def onchange_attribute(self):
         self.value_ids = False
         self.required = self.attribute_id.required
-        self.multi = self.attribute_id.multi
-        self.custom = self.attribute_id.val_custom
         # TODO: Remove all dependencies pointed towards the attribute being
         # changed
-
-    @api.onchange('value_ids')
-    def onchange_values(self):
-        if self.default_val and self.default_val not in self.value_ids:
-            self.default_val = None
 
     custom = fields.Boolean(
         string='Custom',
@@ -170,13 +153,10 @@ class ProductAttributeLine(models.Model):
         string='Required',
         help="Is this attribute required?"
     )
+
     multi = fields.Boolean(
         string='Multi',
         help='Allow selection of multiple values for this attribute?'
-    )
-    default_val = fields.Many2one(
-        comodel_name='product.attribute.value',
-        string='Default Value'
     )
 
     sequence = fields.Integer(string='Sequence', default=10)
@@ -188,62 +168,38 @@ class ProductAttributeLine(models.Model):
     # TODO: Constraint not allowing introducing dependencies that do not exist
     # on the product.template
 
-    @api.multi
-    @api.constrains('value_ids', 'default_val')
-    def _check_default_values(self):
-        for line in self.filtered(lambda l: l.default_val):
-            if line.default_val not in line.value_ids:
-                raise ValidationError(
-                    _("Default values for each attribute line must exist in "
-                      "the attribute values (%s: %s)" % (
-                          line.attribute_id.name, line.default_val.name)
-                      )
-                )
-
 
 class ProductAttributeValue(models.Model):
     _inherit = 'product.attribute.value'
 
+    @api.model
+    def create(self, vals):
+        if self.env.context.get('product_tmpl_id'):
+            # creation from wizard allowed by create_on_the_fly
+            # we must add the attr_value to the attr_line or it won't show in domain
+            product_tmpl_id = self.env.context.get('product_tmpl_id')
+            attribute_id = vals.get('attribute_id',
+                                    self.env.context.get('default_attribute_id'))
+            line = self.env['product.attribute.line'].search([
+                ('product_tmpl_id', '=', product_tmpl_id),
+                ('attribute_id', '=', attribute_id)])
+            match = line.attribute_id.value_ids.filtered(lambda rec: rec.name == vals['name'])
+            if match:
+                record = match[0]
+            else:
+                # default behavior
+                record = super(ProductAttributeValue, self).create(vals)
+            # create related line
+            line.value_ids += record
+        else:
+            record = super(ProductAttributeValue, self).create(vals)
+        return record
+
     @api.multi
     def copy(self, default=None):
-        if not default:
-            default = {}
         default.update({'name': self.name + " (copy)"})
         product = super(ProductAttributeValue, self).copy(default)
         return product
-
-    @api.multi
-    def _compute_weight_extra(self):
-        for product_attribute in self:
-            product_tmpl_id = product_attribute._context.get('active_id')
-            if product_tmpl_id:
-                price = product_attribute.price_ids.filtered(
-                    lambda price: price.product_tmpl_id.id == product_tmpl_id
-                )
-                product_attribute.weight_extra = price.weight_extra
-            else:
-                product_attribute.weight_extra = 0.0
-
-    def _inverse_weight_extra(self):
-        product_tmpl_id = self._context.get('active_id')
-        if not product_tmpl_id:
-            return
-
-        AttributePrice = self.env['product.attribute.price']
-        prices = AttributePrice.search([
-            ('value_id', 'in', self.ids),
-            ('product_tmpl_id', '=', product_tmpl_id)
-        ])
-        updated = prices.mapped('value_id')
-        if prices:
-            prices.write({'weight_extra': self.weight_extra})
-        else:
-            for value in self - updated:
-                AttributePrice.create({
-                    'product_tmpl_id': product_tmpl_id,
-                    'value_id': value.id,
-                    'weight_extra': self.weight_extra,
-                })
 
     active = fields.Boolean(
         string='Active',
@@ -255,69 +211,6 @@ class ProductAttributeValue(models.Model):
         comodel_name='product.product',
         string='Related Product'
     )
-    attribute_line_ids = fields.Many2many(
-        comodel_name='product.attribute.line',
-        string="Attribute Lines",
-        copy=False
-    )
-    weight_extra = fields.Float(
-        string='Attribute Weight Extra',
-        compute='_compute_weight_extra',
-        inverse='_inverse_weight_extra',
-        default=0.0,
-        digits=dp.get_precision('Product Weight'),
-        help="Weight Extra: Extra weight for the variant with this attribute"
-        "value on sale price. eg. 200 price extra, 1000 + 200 = 1200."
-    )
-    image = fields.Binary(
-        string='Image',
-        attachment=True,
-        help="Attribute value image (Display on website for radio buttons)"
-    )
-    image_medium = fields.Binary(
-        string="Medium Image",
-        attachment=True,
-        help="Attribute value medium size image"
-    )
-    image_small = fields.Binary(
-        string="Small Image",
-        attachment=True,
-        help="Attribute value small size image"
-    )
-    # prevent to add new attr-value from adding
-    # in already created template
-    product_ids = fields.Many2many(
-        comodel_name='product.product',
-        copy=False
-    )
-
-    @api.model
-    def create(self, vals):
-        tools.image_resize_images(vals)
-        return super(ProductAttributeValue, self).create(vals)
-
-    @api.multi
-    def write(self, vals):
-        tools.image_resize_images(vals)
-        return super(ProductAttributeValue, self).write(vals)
-
-    @api.multi
-    def name_get(self):
-        res = super(ProductAttributeValue, self).name_get()
-        if not self._context.get('show_price_extra'):
-            return res
-        extra_prices = {
-            av.id: av.price_extra for av in self if av.price_extra
-        }
-
-        res_prices = []
-
-        for val in res:
-            price_extra = extra_prices.get(val[0])
-            if price_extra:
-                val = (val[0], '%s ( +%s )' % (val[1], price_extra))
-            res_prices.append(val)
-        return res_prices
 
     @api.model
     def name_search(self, name='', args=None, operator='ilike', limit=100):
@@ -345,8 +238,8 @@ class ProductAttributeValue(models.Model):
             val_ids = set(tmpl_vals.ids)
             if preset_val_ids:
                 val_ids -= set(arg[2])
-            val_ids = self.env['product.config.session'].values_available(
-                val_ids, preset_val_ids, product_tmpl_id=product_tmpl_id)
+            val_ids = product_tmpl.values_available(
+                val_ids, preset_val_ids)
             new_args.append(('id', 'in', val_ids))
             mono_tmpl_lines = product_tmpl.attribute_line_ids.filtered(
                 lambda l: not l.multi)
@@ -360,90 +253,12 @@ class ProductAttributeValue(models.Model):
         res = super(ProductAttributeValue, self).name_search(
             name=name, args=args, operator=operator, limit=limit)
         return res
-
     # TODO: Prevent unlinking custom options by overriding unlink
 
     # _sql_constraints = [
     #    ('unique_custom', 'unique(id,allow_custom_value)',
     #    'Only one custom value per dimension type is allowed')
     # ]
-
-
-class ProductAttributePrice(models.Model):
-    _inherit = "product.attribute.price"
-    # Leverage product.attribute.price to compute the extra weight each
-    # attribute adds
-
-    weight_extra = fields.Float(
-        string="Weight",
-        digits=dp.get_precision('Product Weight')
-    )
-
-
-class ProductAttributeValueLine(models.Model):
-    _name = 'product.attribute.value.line'
-
-    sequence = fields.Integer(string='Sequence', default=10)
-    product_tmpl_id = fields.Many2one(
-        comodel_name='product.template',
-        string='Product Template',
-        ondelete='cascade',
-        required=True
-    )
-    value_id = fields.Many2one(
-        comodel_name='product.attribute.value',
-        required="True",
-        string="Attribute Value",
-    )
-    attribute_id = fields.Many2one(
-        comodel_name='product.attribute',
-        related='value_id.attribute_id',
-    )
-    value_ids = fields.Many2many(
-        comodel_name='product.attribute.value',
-        relation="product_attribute_value_product_attribute_value_line_rel",
-        column1="product_attribute_value_line_id",
-        column2="product_attribute_value_id",
-        string="Values Configuration",
-    )
-    product_value_ids = fields.Many2many(
-        comodel_name='product.attribute.value',
-        relation="product_attr_values_attr_values_rel",
-        column1="product_val_id",
-        column2="attr_val_id",
-        compute='_compute_get_value_id',
-        store=True
-    )
-
-    @api.multi
-    @api.depends('product_tmpl_id', 'product_tmpl_id.attribute_line_ids',
-                 'product_tmpl_id.attribute_line_ids.value_ids')
-    def _compute_get_value_id(self):
-        for attr_val_line in self:
-            template = attr_val_line.product_tmpl_id
-            value_list = template.attribute_line_ids.mapped('value_ids')
-            attr_val_line.product_value_ids = [(6, 0, value_list.ids)]
-
-    _order = 'sequence'
-
-    @api.multi
-    @api.constrains('value_ids')
-    def _validate_configuration(self):
-        """Ensure that the passed configuration in value_ids is a valid"""
-        cfg_session_obj = self.env['product.config.session']
-        for attr_val_line in self:
-            value_ids = attr_val_line.value_ids.ids
-            value_ids.append(attr_val_line.value_id.id)
-            valid = cfg_session_obj.validate_configuration(
-                value_ids=value_ids,
-                product_tmpl_id=attr_val_line.product_tmpl_id.id,
-                final=False
-            )
-            if not valid:
-                raise ValidationError(
-                    _('Values provided to the attribute value line are '
-                      'incompatible with the current rules')
-                )
 
 
 class ProductAttributeValueCustom(models.Model):

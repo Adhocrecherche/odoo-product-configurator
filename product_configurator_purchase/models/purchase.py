@@ -1,24 +1,6 @@
-from odoo import api, fields, models
+# -*- coding: utf-8 -*-
 
-
-class PurchaseOrder(models.Model):
-    _inherit = 'purchase.order'
-
-    @api.multi
-    def action_config_start(self):
-        """Return action to start configuration wizard"""
-        return {
-            'type': 'ir.actions.act_window',
-            'res_model': 'product.configurator.purchase',
-            'name': "Product Configurator",
-            'view_mode': 'form',
-            'target': 'new',
-            'context': dict(
-                self.env.context,
-                default_order_id=self.id,
-                wizard_model='product.configurator.purchase',
-            ),
-        }
+from odoo import models, fields, api
 
 
 class PurchaseOrderLine(models.Model):
@@ -30,10 +12,12 @@ class PurchaseOrderLine(models.Model):
         related="product_id.value_custom_ids",
         string="Custom Values"
     )
+
+    # product_id = fields.Many2one(domain=['|', ('reuse_variant', '=', True), ('config_ok', '=', False)])
+
     config_ok = fields.Boolean(
-        related="product_id.config_ok",
-        string="Configurable",
-        readonly=True
+        related='product_id.config_ok',
+        string="Configurable"
     )
 
     @api.multi
@@ -41,17 +25,26 @@ class PurchaseOrderLine(models.Model):
         """ Creates and launches a product configurator wizard with a linked
         template and variant in order to re-configure a existing product. It is
         esetially a shortcut to pre-fill configuration data of a variant"""
-        wizard_model = 'product.configurator.purchase'
-        extra_vals = {
-            'order_id': self.order_id.id,
-            'order_line_id': self.id,
+
+        cfg_steps = self.product_id.product_tmpl_id.config_step_line_ids
+        active_step = str(cfg_steps[0].id) if cfg_steps else 'configure'
+
+        wizard_obj = self.env['product.configurator']
+        wizard = wizard_obj.create({
             'product_id': self.product_id.id,
-        }
-        self = self.with_context({
-            'default_order_id': self.order_id.id,
-            'default_order_line_id': self.id
+            'state': active_step,
+            'purchase_order_line_id': self.id,
         })
 
-        return self.product_id.product_tmpl_id.create_config_wizard(
-            model_name=wizard_model, extra_vals=extra_vals
-        )
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'product.configurator',
+            'name': "Configure Product",
+            'view_mode': 'form',
+            'context': dict(
+                self.env.context,
+                wizard_id=wizard.id,
+            ),
+            'target': 'new',
+            'res_id': wizard.id,
+        }
