@@ -14,7 +14,7 @@ class ProductProduct(models.Model):
         - Extra price For Attribute value
         - Extra price For Custom value.
     """
-    @api.multi
+    
     def _compute_product_price_extra(self):
         """Compute price of configurable products as sum
         of products related to attribute values picked"""

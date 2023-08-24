@@ -8,7 +8,7 @@ from ast import literal_eval
 class ProductConfigDomain(models.Model):
     _name = 'product.config.domain'
 
-    @api.multi
+    
     @api.depends('implied_ids')
     def _get_trans_implied(self):
         "Computes the transitive closure of relation implied_ids"
@@ -24,7 +24,7 @@ class ProductConfigDomain(models.Model):
         for domain in self:
             domain.trans_implied_ids = linearize(domain)
 
-    @api.multi
+    
     def compute_domain(self):
         """ Returns a list of domains defined on a product.config.domain_line_ids
             and all implied_ids"""
@@ -184,7 +184,7 @@ class ProductConfigLine(models.Model):
 
     _order = 'product_tmpl_id, sequence, id'
 
-    @api.multi
+    
     @api.constrains('value_ids')
     def check_value_attributes(self):
         for line in self:
@@ -231,7 +231,7 @@ class ProductConfigDefault(models.Model):
 
     _order = 'product_tmpl_id, sequence, id'
 
-    @api.multi
+    
     def _compute_attr_vals(self):
         for config_default in self:
             config_default.attr_line_val_ids = \
@@ -273,7 +273,7 @@ class ProductConfigImage(models.Model):
 
     _order = 'sequence'
 
-    @api.multi
+    
     @api.constrains('value_ids')
     def _check_value_ids(self):
         for cfg_img in self:
@@ -342,7 +342,7 @@ class ProductConfigStepLine(models.Model):
 class ProductConfigSession(models.Model):
     _name = 'product.config.session'
 
-    @api.multi
+    
     @api.depends('value_ids', 'custom_value_ids', 'custom_value_ids.value')
     def _compute_cfg_price(self):
         for session in self:
@@ -352,7 +352,7 @@ class ProductConfigSession(models.Model):
                     session.value_ids.ids, custom_vals)
                 session.price = price['total']
 
-    @api.multi
+    
     def _get_custom_vals_dict(self):
         """Retrieve session custom values as a dictionary of the form
            {attribute_id: parsed_custom_value}"""
@@ -402,7 +402,7 @@ class ProductConfigSession(models.Model):
         default='draft'
     )
 
-    @api.multi
+    
     def action_confirm(self):
         # TODO: Implement method to generate dict from custom vals
         custom_val_dict = {
@@ -415,7 +415,7 @@ class ProductConfigSession(models.Model):
             self.state = 'done'
         return valid
 
-    @api.multi
+    
     def update_config(self, attr_val_dict=None, custom_val_dict=None):
         """Update the session object with the given value_ids and custom values.
 
@@ -496,7 +496,7 @@ class ProductConfigSession(models.Model):
 
         self.write(update_vals)
 
-    @api.multi
+    
     def write(self, vals):
         """Validate configuration when writing new values to session"""
         # TODO: Issue warning when writing to value_ids or custom_val_ids

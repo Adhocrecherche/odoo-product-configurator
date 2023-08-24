@@ -12,7 +12,7 @@ class ProductConfigurator(models.TransientModel):
         readonly=True,
     )
 
-    @api.multi
+    
     def action_config_done_postprocess(self, variant):
         if self.env.context.get('active_model') in ('purchase.order', 'purchase.order.line'):
             line_vals = {'product_id': variant.id}

@@ -54,7 +54,7 @@ class ProductProduct(models.Model):
             (line.attribute_id, line.display_mode, value_dict[line.attribute_id.name])
             for line in self.attribute_line_ids.sorted('sequence')]
 
-    @api.multi
+    
     def name_get(self):
         """ Override variant name
         """

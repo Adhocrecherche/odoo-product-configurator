@@ -7,7 +7,7 @@ from odoo.exceptions import ValidationError
 class ProductConfigurator(models.TransientModel):
     _inherit = 'product.configurator'
 
-    @api.multi
+    
     def get_state_selection(self):
         """ Select Template step is removed for product template/variant buttons """
         if self.env.context.get('active_model') in ('product.template', 'product.product'):
@@ -33,7 +33,7 @@ class ProductConfigurator(models.TransientModel):
         else:
             return super(ProductConfigurator, self).get_state_selection()
 
-    @api.multi
+    
     def action_config_done_postprocess(self, variant):
         if self.env.context.get('active_model') in ('product.template', 'product.product'):
             # nothing to do

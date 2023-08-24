@@ -126,7 +126,7 @@ class ProductTemplate(models.Model):
         ]
         return prices
 
-    @api.multi
+    
     def _get_option_values(self, value_ids, pricelist):
         """Return only attribute values that have products attached with a
         price set to them"""
@@ -136,7 +136,7 @@ class ProductTemplate(models.Model):
             lambda x: x.product_id.price)
         return values
 
-    @api.multi
+    
     def get_components_prices(self, prices, value_ids,
                               custom_values, pricelist):
         """Return prices of the components which make up the final
@@ -163,7 +163,7 @@ class ProductTemplate(models.Model):
             prices['total'] += total_included
         return prices
 
-    @api.multi
+    
     def get_cfg_price(self, value_ids, custom_values=None,
                       pricelist_id=None, formatLang=False):
         """ Computes the price of the configured product based on the configuration
@@ -215,7 +215,7 @@ class ProductTemplate(models.Model):
             return self.formatPrices(prices)
         return prices
 
-    @api.multi
+    
     def search_variant(self, value_ids, custom_values=None):
         """ Searches product.variants with given value_ids and custom values
             given in the custom_values dict
@@ -286,7 +286,7 @@ class ProductTemplate(models.Model):
                 max_matches = matches
         return img_obj
 
-    @api.multi
+    
     def encode_custom_values(self, custom_values):
         """ Hook to alter the values of the custom values before creating or writing
 
@@ -315,7 +315,7 @@ class ProductTemplate(models.Model):
             custom_lines.append((0, 0, custom_vals))
         return custom_lines
 
-    @api.multi
+    
     def get_variant_vals(self, value_ids, custom_values=None, **kwargs):
         """ Hook to alter the values of the product variant before creation
 
@@ -346,14 +346,14 @@ class ProductTemplate(models.Model):
 
         return vals
 
-    @api.multi
+    
     def create_variant(self, value_ids, custom_values=None):
         """Wrapper method for backward compatibility"""
         # TODO: Remove in newer versions
         return self.create_get_variant(
             value_ids=value_ids, custom_values=custom_values)
 
-    @api.multi
+    
     def create_get_variant(self, value_ids, custom_values=None):
         """ Creates a new product variant with the attributes passed via value_ids
         and custom_values or retrieves an existing one based on search result
@@ -428,7 +428,7 @@ class ProductTemplate(models.Model):
             avail &= stack.pop()
         return avail
 
-    @api.multi
+    
     def values_available(self, attr_val_ids, sel_val_ids):
         """Determines whether the attr_values from the product_template
         are available for selection given the configuration ids and the
@@ -455,7 +455,7 @@ class ProductTemplate(models.Model):
 
         return avail_val_ids
 
-    @api.multi
+    
     def find_default_value(self, selectable_value_ids, value_ids):
         """Based on the current values, which of the available template value ids
             is the best default value to use.
@@ -498,7 +498,7 @@ class ProductTemplate(models.Model):
             set(default_line.value_ids.ids) & set(selectable_value_ids)
         ).pop()
 
-    @api.multi
+    
     def validate_configuration(self, value_ids, custom_vals=None, final=True):
         """ Verifies if the configuration values passed via value_ids and custom_vals
         are valid
@@ -549,7 +549,7 @@ class ProductTemplate(models.Model):
                 return False
         return True
 
-    @api.multi
+    
     def toggle_config(self):
         for record in self:
             record.config_ok = not record.config_ok
@@ -563,7 +563,7 @@ class ProductTemplate(models.Model):
                                                      operator=operator,
                                                      limit=limit)
 
-    @api.multi
+    
     def create_variant_ids(self):
         """ Prevent configurable products from creating variants as these serve
             only as a template for the product configurator"""
@@ -572,7 +572,7 @@ class ProductTemplate(models.Model):
             return None
         return super(ProductTemplate, templates).create_variant_ids()
 
-    @api.multi
+    
     def unlink(self):
         """ Prevent the removal of configurable product templates
             from variants"""
@@ -595,7 +595,7 @@ class ProductProduct(models.Model):
         }
         return conversions
 
-    @api.multi
+    
     @api.constrains('attribute_value_ids')
     def _check_duplicate_product(self):
         if not self.config_ok:
@@ -625,7 +625,7 @@ class ProductProduct(models.Model):
                       "(identical attribute values)")
                 )
 
-    @api.multi
+    
     def _compute_product_price_extra(self):
         """Compute price of configurable products as sum
         of products related to attribute values picked"""
@@ -672,7 +672,7 @@ class ProductProduct(models.Model):
         readonly=True,
     )
 
-    @api.multi
+    
     def _check_attribute_value_ids(self):
         """ Removing multi contraint attribute to enable multi selection. """
         return True
@@ -714,7 +714,7 @@ class ProductProduct(models.Model):
     def get_config_name(self):
         return self.name
 
-    @api.multi
+    
     def unlink(self):
         """ Signal unlink from product variant through context so
             removal can be stopped for configurable templates """
@@ -722,7 +722,7 @@ class ProductProduct(models.Model):
         self.env.context = ctx
         return super(ProductProduct, self).unlink()
 
-    @api.multi
+    
     def _compute_name(self):
         """ Compute the name of the configurable products and use template
             name for others"""

@@ -20,7 +20,7 @@ class PurchaseOrderLine(models.Model):
         string="Configurable"
     )
 
-    @api.multi
+    
     def reconfigure_product(self):
         """ Creates and launches a product configurator wizard with a linked
         template and variant in order to re-configure a existing product. It is

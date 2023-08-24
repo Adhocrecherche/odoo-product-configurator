@@ -278,7 +278,7 @@ class ProductConfigurator(models.TransientModel):
 
         return xml_view
 
-    @api.multi
+    
     def read(self, fields=None, load='_classic_read'):
         """Remove mode dynamic fields from the fields list and update the
         returned values with the dynamic data stored in attribute_line_ids"""
@@ -296,7 +296,7 @@ class ProductConfigurator(models.TransientModel):
             res[0][self.mode_prefix + str(attr_line.attribute_id.id)] = attr_line.display_mode
         return res
 
-    @api.multi
+    
     def write(self, vals):
         """Prevent database storage of mode dynamic fields"""
 

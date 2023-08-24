@@ -6,7 +6,7 @@ from odoo import models, api
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
-    @api.multi
+    
     def create_get_variant(self, value_ids, custom_values=None):
         """Add bill of matrials to the configured variant."""
         if custom_values is None:

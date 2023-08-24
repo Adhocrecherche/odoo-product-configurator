@@ -7,7 +7,7 @@ from odoo.exceptions import ValidationError
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
-    @api.multi
+    
     def find_duplicates(self, value_ids, custom_values=None, product_id=None):
         duplicates = super(ProductTemplate, self).find_duplicates(
             value_ids, custom_values=custom_values, product_id=product_id)

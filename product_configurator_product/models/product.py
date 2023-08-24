@@ -6,7 +6,7 @@ from odoo import models, api
 class ProductProduct(models.Model):
     _inherit = 'product.product'
 
-    @api.multi
+    
     def reconfigure_product_variant(self):
         """ Copied from product_configurator_wizard.sale.py """
 
@@ -40,7 +40,7 @@ class ProductProduct(models.Model):
 class ProductTemplate(models.Model):
     _inherit = 'product.template'
 
-    @api.multi
+    
     def reconfigure_product_template(self):
         """ Copied from product_configurator_wizard.sale.py """
 

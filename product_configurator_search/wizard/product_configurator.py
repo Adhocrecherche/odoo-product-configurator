@@ -31,7 +31,7 @@ class ProductConfigurator(models.TransientModel):
         'product.attribute.value', string='Manufacturer', domain=lambda self: [
             ('attribute_id', '=', self.env.ref('product_configurator_search.attribute_manufacturer').id)])
 
-    @api.multi
+    
     @api.onchange('product_id')
     def _onchange_product_id(self):
         self.ensure_one()
@@ -50,7 +50,7 @@ class ProductConfigurator(models.TransientModel):
             self.manufacturer_id = self.product_id.attribute_value_ids.filtered(
                 lambda x: x.attribute_id == attribute_manufacturer)
 
-    @api.multi
+    
     @api.onchange('search_filter')
     def _onchange_search_filter(self):
         if self.search_filter and len(self.search_filter) > 2:
@@ -63,17 +63,17 @@ class ProductConfigurator(models.TransientModel):
             self.mpn_ids = None
         return self.update_variant_domain(select=True)
 
-    @api.multi
+    
     @api.onchange('manufacturer_id')
     def _onchange_manufacturer_id(self):
         return self.update_variant_domain(select=True)
 
-    @api.multi
+    
     @api.onchange('product_tmpl_id')
     def _onchange_product_tmpl_id(self):
         return self.update_variant_domain(select=True)
 
-    @api.multi
+    
     def update_variant_domain(self, select=True):
         self.ensure_one()
         if self.env.context.get('noupdate_variant', False):
@@ -107,7 +107,7 @@ class ProductConfigurator(models.TransientModel):
             self.with_context(noupdate_variant=True).product_id = allowed_product_ids[0]
         return {'domain': {'product_id': [('id', 'in', allowed_product_ids.ids)]}}
 
-    @api.multi
+    
     def action_next_step(self):
         # remember attribute_values
         if not self.value_ids:

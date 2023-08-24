@@ -10,7 +10,7 @@ from ast import literal_eval
 class ProductAttribute(models.Model):
     _inherit = 'product.attribute'
 
-    @api.multi
+    
     def copy(self, default=None):
         for attr in self:
             default.update({'name': attr.name + " (copy)"})
@@ -195,7 +195,7 @@ class ProductAttributeValue(models.Model):
             record = super(ProductAttributeValue, self).create(vals)
         return record
 
-    @api.multi
+    
     def copy(self, default=None):
         default.update({'name': self.name + " (copy)"})
         product = super(ProductAttributeValue, self).copy(default)
@@ -263,7 +263,7 @@ class ProductAttributeValue(models.Model):
 
 class ProductAttributeValueCustom(models.Model):
 
-    @api.multi
+    
     @api.depends('attribute_id', 'attribute_id.uom_id')
     def _compute_val_name(self):
         for attr_val_custom in self:

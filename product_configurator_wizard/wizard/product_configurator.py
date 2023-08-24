@@ -33,7 +33,7 @@ class ProductConfigurator(models.TransientModel):
     # depending on complexity and AFK time we must increase the lifespan
     # of this TransientModel life
 
-    @api.multi
+    
     @api.depends('product_tmpl_id', 'value_ids', 'custom_value_ids')
     def _compute_cfg_image(self):
         # TODO: Update when allowing custom values to influence image
@@ -43,7 +43,7 @@ class ProductConfigurator(models.TransientModel):
 
     # TODO: We could use a m2o instead of a monkeypatched select field but
     # adding new steps should be trivial via custom development
-    @api.multi
+    
     def get_state_selection(self):
         """Get the states of the wizard using standard values and optional
         configuration steps set on the product.template via
@@ -192,7 +192,7 @@ class ProductConfigurator(models.TransientModel):
 
         return vals
 
-    @api.multi
+    
     def onchange(self, values, field_name, field_onchange):
         """ Override the onchange wrapper to return domains to dynamic
         fields as onchange isn't triggered for non-db fields
@@ -666,7 +666,7 @@ class ProductConfigurator(models.TransientModel):
                 vals.update({'custom_value_ids': custom_vals})
         return super(ProductConfigurator, self).create(vals)
 
-    @api.multi
+    
     def read(self, fields=None, load='_classic_read'):
         """Remove dynamic fields from the fields list and update the
         returned values with the dynamic data stored in value_ids"""
@@ -741,7 +741,7 @@ class ProductConfigurator(models.TransientModel):
             res[0].update(dynamic_vals)
         return res
 
-    @api.multi
+    
     def write(self, vals):
         """Prevent database storage of dynamic fields and instead write values
         to database persistent value_ids field"""
@@ -813,13 +813,13 @@ class ProductConfigurator(models.TransientModel):
         res = super(ProductConfigurator, self).write(vals)
         return res
 
-    @api.multi
+    
     def unlink(self):
         """Remove parent model as polymorphic inheritance unlinks inheriting
            model with the parent"""
         return self.mapped('config_session').unlink()
 
-    @api.multi
+    
     def action_next_step(self):
         """Proceeds to the next step of the configuration process. This usually
         implies the next configuration step (if any) defined via the
@@ -874,7 +874,7 @@ class ProductConfigurator(models.TransientModel):
 
         return wizard_action
 
-    @api.multi
+    
     def action_previous_step(self):
         """Proceeds to the next step of the configuration process. This usually
     implies the next configuration step (if any) defined via the
@@ -928,7 +928,7 @@ class ProductConfigurator(models.TransientModel):
             })
         return vals
 
-    @api.multi
+    
     def action_config_done(self):
         """Parse values and execute final code before closing the wizard"""
         custom_vals = {
@@ -957,7 +957,7 @@ class ProductConfigurator(models.TransientModel):
         self.action_config_done_postprocess(variant)
         self.unlink()
 
-    @api.multi
+    
     def action_config_done_postprocess(self, variant):
         """ hook to update active record before wizard is deleted """
         so = self.env['sale.order'].browse(self.env.context.get('active_id'))
