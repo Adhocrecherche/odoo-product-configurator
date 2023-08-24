@@ -2,9 +2,13 @@
 
 from lxml import etree
 
-from odoo.osv import orm
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
+from odoo.addons.base.models.ir_ui_view import (
+    transfer_field_to_modifiers,
+    transfer_modifiers_to_node,
+    transfer_node_to_modifiers,
+)
 
 
 FIELD_TYPES = [(key, key) for key in sorted(fields.Field.by_type)]
@@ -28,6 +32,37 @@ class ProductConfigurator(models.TransientModel):
     # Prefix for the dynamicly injected fields
     field_prefix = '__attribute-'
     custom_field_prefix = '__custom-'
+
+    @api.model
+    def setup_modifiers(self, node, field=None, context=None, current_node_path=None):
+        """Processes node attributes and field descriptors to generate
+        the ``modifiers`` node attribute and set it on the provided node.
+
+        Alters its first argument in-place.
+
+        :param node: ``field`` node from an OpenERP view
+        :type node: lxml.etree._Element
+        :param dict field: field descriptor corresponding to the provided node
+        :param dict context: execution context used to evaluate node attributes
+        :param bool current_node_path: triggers the ``column_invisible`` code
+                                  path (separate from ``invisible``): in
+                                  tree view there are two levels of
+                                  invisibility, cell content (a column is
+                                  present but the cell itself is not
+                                  displayed) with ``invisible`` and column
+                                  invisibility (the whole column is
+                                  hidden) with ``column_invisible``.
+        :returns: nothing
+        """
+        modifiers = {}
+        if field is not None:
+            transfer_field_to_modifiers(field=field, modifiers=modifiers)
+        transfer_node_to_modifiers(
+            node=node,
+            modifiers=modifiers,
+            context=context
+        )
+        transfer_modifiers_to_node(modifiers=modifiers, node=node)
 
     # TODO: Since the configuration process can take a bit of time
     # depending on complexity and AFK time we must increase the lifespan
