@@ -2,7 +2,6 @@
 
 from lxml import etree
 
-from odoo.osv import orm
 from odoo import api, models, _
 from odoo.exceptions import Warning
 
@@ -10,11 +9,49 @@ hide = _("Hide")
 onlyvalue = _("Only Value")
 withlabel = _("With Label")
 
+from odoo.addons.base.models.ir_ui_view import (
+    transfer_field_to_modifiers,
+    transfer_modifiers_to_node,
+    transfer_node_to_modifiers,
+)
+
+
 class ProductConfigurator(models.TransientModel):
     _inherit = 'product.configurator'
 
     # Prefix for the dynamicly injected fields
     mode_prefix = '__mode-'
+
+    @api.model
+    def setup_modifiers(self, node, field=None, context=None, current_node_path=None):
+        """Processes node attributes and field descriptors to generate
+        the ``modifiers`` node attribute and set it on the provided node.
+
+        Alters its first argument in-place.
+
+        :param node: ``field`` node from an OpenERP view
+        :type node: lxml.etree._Element
+        :param dict field: field descriptor corresponding to the provided node
+        :param dict context: execution context used to evaluate node attributes
+        :param bool current_node_path: triggers the ``column_invisible`` code
+                                  path (separate from ``invisible``): in
+                                  tree view there are two levels of
+                                  invisibility, cell content (a column is
+                                  present but the cell itself is not
+                                  displayed) with ``invisible`` and column
+                                  invisibility (the whole column is
+                                  hidden) with ``column_invisible``.
+        :returns: nothing
+        """
+        modifiers = {}
+        if field is not None:
+            transfer_field_to_modifiers(field=field, modifiers=modifiers)
+        transfer_node_to_modifiers(
+            node=node,
+            modifiers=modifiers,
+            context=context
+        )
+        transfer_modifiers_to_node(modifiers=modifiers, node=node)
 
     @api.model
     def is_dynamic_field(self, name):
@@ -194,7 +231,7 @@ class ProductConfigurator(models.TransientModel):
                 'label',
                 attrs=str(attrs))
             node.attrib['for'] = field_name  # for is a reserved keyword
-            orm.setup_modifiers(node)
+            self.setup_modifiers(node)
             xml_dynamic_form.append(node)
             div = etree.Element('div', style='width: auto;')
             # CHANGES END
@@ -229,7 +266,7 @@ class ProductConfigurator(models.TransientModel):
 
             # Apply the modifiers (attrs) on the newly inserted field in the
             # arch and add it to the view
-            orm.setup_modifiers(node)
+            self.setup_modifiers(node)
             # CHANGES START
             # xml_dynamic_form.append(node)
             div.append(node)
@@ -239,7 +276,7 @@ class ProductConfigurator(models.TransientModel):
                 style="width: auto;",
                 attrs=str(attrs),
                 readonly="1")
-            orm.setup_modifiers(node)
+            self.setup_modifiers(node)
             div.append(node)
             # CHANGES END
 
@@ -269,7 +306,7 @@ class ProductConfigurator(models.TransientModel):
                     attrs=str(attrs),
                     widget=widget
                 )
-                orm.setup_modifiers(node)
+                self.setup_modifiers(node)
                 # CHANGES START
                 # xml_dynamic_form.append(node)
                 div.append(node)
