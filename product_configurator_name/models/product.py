@@ -100,7 +100,7 @@ class ProductProduct(models.Model):
                 else:
                     # display only the attributes with multiple possible values on the template
                     variable_attributes = product.attribute_line_ids.filtered(lambda l: len(l.value_ids) > 1).mapped('attribute_id')
-                    variant = product.attribute_value_ids._variant_name(variable_attributes)
+                    variant = product.product_template_attribute_value_ids._get_combination_name()
 
                 name = variant and "%s%s%s" % (product.name, separator, variant) or product.name
             # END CHANGES
