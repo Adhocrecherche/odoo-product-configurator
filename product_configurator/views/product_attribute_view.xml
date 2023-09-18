@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <record id="product.variants_action" model="ir.actions.act_window">
-        <field name="view_mode">tree,form</field>
+    <record id="variants_action" model="ir.actions.act_window">
+        <field name="name">Attribute Values</field>
+        <field name="type">ir.actions.act_window</field>
+        <field name="res_model">product.attribute.value</field>
+        <field name="view_mode">tree, form</field>
     </record>
 
     <record id="product.attribute_action" model="ir.actions.act_window">
@@ -70,11 +73,12 @@
     <record id="product_attribute_value_tree_view" model="ir.ui.view">
         <field name="name">product.config.attribute.value.tree</field>
         <field name="model">product.attribute.value</field>
-        <field name="inherit_id" ref="product.variants_tree_view"/>
         <field name="arch" type="xml">
-            <xpath expr="//tree" position="attributes">
-                <attribute name="editable"/>
-            </xpath>
+            <tree string="Variant Values" editable="top">
+                <field name="sequence" widget="handle"/>
+                <field name="attribute_id"/>
+                <field name="name"/>
+            </tree>
         </field>
     </record>
 
