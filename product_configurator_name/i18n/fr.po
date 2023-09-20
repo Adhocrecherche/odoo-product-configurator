@@ -49,12 +49,12 @@ msgid "Hidden Attributes"
 msgstr "Attributs cachés"
 
 #. module: product_configurator_name
-#: selection:product.attribute.line,display_mode:0
+#: selection:product.template.attribute.line,display_mode:0
 msgid "Hide"
 msgstr "Masquer"
 
 #. module: product_configurator_name
-#: selection:product.attribute.line,display_mode:0
+#: selection:product.template.attribute.line,display_mode:0
 msgid "Only Value"
 msgstr "Valeur seule"
 
@@ -70,14 +70,14 @@ msgid "There was a problem rendering the view (dynamic_form not found)"
 msgstr "Problème de génération du formulaire (node dynamic_form introuvable)"
 
 #. module: product_configurator_name
-#: selection:product.attribute.line,display_mode:0
+#: selection:product.template.attribute.line,display_mode:0
 msgid "With Label"
 msgstr "Avec étiquette"
 
 #. module: product_configurator_name
 #: model:ir.model,name:product_configurator_name.model_product_attribute_line
-msgid "product.attribute.line"
-msgstr "product.attribute.line"
+msgid "product.template.attribute.line"
+msgstr "product.template.attribute.line"
 
 #. module: product_configurator_name
 #: model:ir.model,name:product_configurator_name.model_product_configurator

@@ -595,7 +595,6 @@ class ProductProduct(models.Model):
         }
         return conversions
 
-    
     @api.constrains('attribute_value_ids')
     def _check_duplicate_product(self):
         if not self.config_ok:
@@ -625,7 +624,6 @@ class ProductProduct(models.Model):
                       "(identical attribute values)")
                 )
 
-    
     def _compute_product_price_extra(self):
         """Compute price of configurable products as sum
         of products related to attribute values picked"""
@@ -672,7 +670,6 @@ class ProductProduct(models.Model):
         readonly=True,
     )
 
-    
     def _check_attribute_value_ids(self):
         """ Removing multi contraint attribute to enable multi selection. """
         return True
@@ -713,7 +710,6 @@ class ProductProduct(models.Model):
     # pattern
     def get_config_name(self):
         return self.name
-
     
     def unlink(self):
         """ Signal unlink from product variant through context so
@@ -721,7 +717,6 @@ class ProductProduct(models.Model):
         ctx = dict(self.env.context, unlink_from_variant=True)
         self.env.context = ctx
         return super(ProductProduct, self).unlink()
-
     
     def _compute_name(self):
         """ Compute the name of the configurable products and use template
@@ -731,3 +726,6 @@ class ProductProduct(models.Model):
                 product.config_name = product.get_config_name()
             else:
                 product.config_name = product.name
+
+    # Retriré de addons/product/models/product.py dans Odoo V13
+    attribute_value_ids = fields.Many2many('product.attribute.value', string='Attributes', ondelete='restrict')

@@ -1,4 +1,5 @@
 /* Add one more option to boolean_button form widget (displayed in the product.template form view) */
+/* Désactivé. TODO: A migrer pour 13
 
 odoo.define('product_configurator.FormView', function (require) {
 "use strict";
@@ -24,3 +25,4 @@ var FieldBooleanButton = core.form_widget_registry.map['boolean_button'].extend(
 core.form_widget_registry.add('boolean_button', FieldBooleanButton);
 
 });
+*/

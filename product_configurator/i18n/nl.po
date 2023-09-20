@@ -966,8 +966,8 @@ msgstr "Bij het controleren op varianten met dezelfde configuratie, dienen we oo
 
 #. module: product_configurator
 #: model:ir.model,name:product_configurator.model_product_attribute_line
-msgid "product.attribute.line"
-msgstr "product.attribute.line"
+msgid "product.template.attribute.line"
+msgstr "product.template.attribute.line"
 
 #. module: product_configurator
 #: model:ir.model,name:product_configurator.model_product_attribute_value
