@@ -640,8 +640,8 @@ msgstr "Schließen wir dieses Feld in der Suche ein, wenn wir Varianten mit der 
 
 #. module: product_configurator
 #: model:ir.model,name:product_configurator.model_product_attribute_line
-msgid "product.attribute.line"
-msgstr "product.attribute.line"
+msgid "product.template.attribute.line"
+msgstr "product.template.attribute.line"
 
 #. module: product_configurator
 #: model:ir.model,name:product_configurator.model_product_attribute_value

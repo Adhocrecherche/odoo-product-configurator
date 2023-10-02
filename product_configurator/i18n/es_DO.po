@@ -637,7 +637,7 @@ msgstr "Cuando se buscan variantes con la misma configuración, ¿se incluye est
 
 #. module: product_configurator
 #: model:ir.model,name:product_configurator.model_product_attribute_line
-msgid "product.attribute.line"
+msgid "product.template.attribute.line"
 msgstr ""
 
 #. module: product_configurator

@@ -172,6 +172,10 @@ class ProductAttributeLine(models.Model):
 class ProductAttributeValue(models.Model):
     _inherit = 'product.attribute.value'
 
+    # Retiré de addons/product/models/product_attribute.py dans Odoo 13
+    def _variant_name(self, variable_attributes):
+        return ", ".join([v.name for v in self if v.attribute_id in variable_attributes])
+
     @api.model
     def create(self, vals):
         if self.env.context.get('product_tmpl_id'):
@@ -263,7 +267,6 @@ class ProductAttributeValue(models.Model):
 
 class ProductAttributeValueCustom(models.Model):
 
-    
     @api.depends('attribute_id', 'attribute_id.uom_id')
     def _compute_val_name(self):
         for attr_val_custom in self:
