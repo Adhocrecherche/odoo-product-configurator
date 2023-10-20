@@ -69,12 +69,12 @@ class ProductConfigurator(models.TransientModel):
     # of this TransientModel life
 
     
-    @api.depends('product_tmpl_id', 'value_ids', 'custom_value_ids')
-    def _compute_cfg_image(self):
-        # TODO: Update when allowing custom values to influence image
-        product_tmpl = self.product_tmpl_id.with_context(bin_size=False)
-        img_obj = product_tmpl.get_config_image_obj(self.value_ids.ids)
-        self.product_img = img_obj.image
+    # @api.depends('product_tmpl_id', 'value_ids', 'custom_value_ids')
+    # def _compute_cfg_image(self):
+    #     # TODO: Update when allowing custom values to influence image
+    #     product_tmpl = self.product_tmpl_id.with_context(bin_size=False)
+    #     img_obj = product_tmpl.get_config_image_obj(self.value_ids.ids)
+    #     self.product_img = img_obj.image
 
     # TODO: We could use a m2o instead of a monkeypatched select field but
     # adding new steps should be trivial via custom development
@@ -220,10 +220,10 @@ class ProductConfigurator(models.TransientModel):
         for list_dfv in [dfv for dfv in dynamic_fields.values()
                          if dfv and isinstance(dfv, list)]:
             config_val_ids.extend(list_dfv[0][2])
-        product_img = self.product_tmpl_id.get_config_image_obj(
-            config_val_ids)
-
-        vals.update(product_img=product_img.image)
+        # product_img = self.product_tmpl_id.get_config_image_obj(
+        #     config_val_ids)
+        #
+        # vals.update(product_img=product_img.image)
 
         return vals
 
@@ -344,10 +344,10 @@ class ProductConfigurator(models.TransientModel):
         string='Product Variant',
         help='Set only when re-configuring a existing variant'
     )
-    product_img = fields.Binary(
-        compute='_compute_cfg_image',
-        readonly=True
-    )
+    # product_img = fields.Binary(
+    #     compute='_compute_cfg_image',
+    #     readonly=True
+    # )
     state = FreeSelection(
         selection='get_state_selection',
         default='select',
